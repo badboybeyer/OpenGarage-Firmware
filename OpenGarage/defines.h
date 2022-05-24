@@ -24,7 +24,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    112   // Firmware version: 111 means 1.1.1
+#define OG_FWV    120   // Firmware version: 111 means 1.1.1
 
 /** GPIO pins */
 #define PIN_RELAY  15 //D8 on nodemcu
@@ -135,11 +135,7 @@ enum {
 
 typedef enum {
   OPTION_FWV = 0, // firmware version
-  OPTION_SN1,     // distance sensor mounting method
   OPTION_SN2,			// switch sensor type
-  OPTION_SNO,			// sensor logic
-  OPTION_DTH,     // distance threshold for door
-  OPTION_VTH,     // distance threshold for vehicle
   OPTION_RIV,     // status check interval
   OPTION_ALM,     // alarm mode
   OPTION_AOO,			// no alarm on opening
