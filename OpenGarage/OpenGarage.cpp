@@ -84,6 +84,7 @@ OptionStruct OpenGarage::options[] = {
   {"host", 0, 0, ""},
 };
 
+#define KAVG 7  // number of samples for debounce filtering
     
 void OpenGarage::begin() {
   digitalWrite(PIN_RESET, HIGH);
