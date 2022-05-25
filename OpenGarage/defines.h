@@ -27,12 +27,12 @@
 #define OG_FWV    120   // Firmware version: 111 means 1.1.1
 
 /** GPIO pins */
-#define PIN_RELAY  16 //D0 on nodemcu
+#define PIN_RELAY  15 //D8 on nodemcu
 #define PIN_BUTTON  0
 #define PIN_TRIG   12 //D6 on nodemcu
 #define PIN_ECHO   14 //D5 on nodemcu
 #define PIN_LED     2
-#define PIN_RESET  15
+#define PIN_RESET  16
 #define PIN_BUZZER 13
 #define PIN_SWITCH  5 //switch sensor: D1 on nodemcu
 #define PIN_TH      4 //temeprature sensor: D2 on nodemcu
