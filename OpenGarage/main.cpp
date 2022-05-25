@@ -308,13 +308,18 @@ String get_ip() {
 
 void sta_controller_fill_json(String& json, bool fullversion=true) {
   json = "";
-  json += F("{\"dist\":");
-  json += distance;
-  if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-    json += F(",\"sn2\":");
-    json += sn2_value;
+  json += F("{");
+  if(og.options[OPTION_SN1].ival != OG_SN1_NONE) {
+    json += F("\"dist\":");
+    json += distance;
+    json += F(",");
   }
-  json += F(",\"door\":");
+  if(og.options[OPTION_SN2].ival != OG_SN2_NONE) {
+    json += F("\"sn2\":");
+    json += sn2_value;
+    json += F(",");    
+  }
+  json += F("\"door\":");
   json += door_status;
   json += F(",\"vehicle\":");
   json += vehicle_status;
@@ -376,13 +381,19 @@ void on_sta_debug() {
 }
 
 void sta_logs_fill_json(String& json) {
+  int ncols = 2;
+  if (og.options[OPTION_SN1].ival != OG_SN1_NONE)
+    ncols += 1;
+  if (og.options[OPTION_SN2].ival != OG_SN2_NONE)
+    ncols += 1;
+  
   json = "";
   json += F("{\"name\":\"");
   json += og.options[OPTION_NAME].sval;
   json += F("\",\"time\":");
   json += curr_utc_time;
   json += F(",\"ncols\":");
-  json += og.options[OPTION_SN2].ival>OG_SN2_NONE ? 4 : 3;
+  json += ncols;
   json += F(",\"logs\":[");
   if(!og.read_log_start()) {
     json += F("]}");
@@ -397,9 +408,11 @@ void sta_logs_fill_json(String& json) {
     json += l.tstamp;
     json += F(",");
     json += l.status;
-    json += F(",");
-    json += l.dist;
-    if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
+    if(og.options[OPTION_SN1].ival != OG_SN1_NONE) {    
+      json += F(",");
+      json += l.dist;
+    }
+    if(og.options[OPTION_SN2].ival != OG_SN2_NONE) {
       json += F(",");
       json += l.sn2;
     }
@@ -1213,9 +1226,10 @@ void check_status() {
       LogStruct l;
       l.tstamp = curr_utc_time;
       l.status = door_status;
-      l.dist = distance;
-      l.sn2 = 255;	// use 255 to indicate invalid value
-      if(og.options[OPTION_SN2].ival>OG_SN2_NONE) l.sn2 = sn2_value;
+      if(og.options[OPTION_SN1].ival != OG_SN1_NONE) l.dist = distance;
+      else l.dist = UINT_MAX;	// use UINT_MAX to indicate invalid value
+      if(og.options[OPTION_SN2].ival != OG_SN2_NONE) l.sn2 = sn2_value;
+      else l.sn2 = CHAR_MAX;	// use CHAR_MAX to indicate invalid value
       og.write_log(l);
 
 #if 0
