@@ -44,7 +44,7 @@ extern OpenGarage og;
  */
 OptionStruct OpenGarage::options[] = {
   {"fwv", OG_FWV,      255, ""},
-  {"sn2", OG_SN2_NONE,   2, ""},
+  {"sn2", OG_SN2_NC,   2, ""},
   {"riv", 5,           300, ""},
   {"alm", OG_ALM_5,      2, ""},
   {"aoo", 0,             1, ""},

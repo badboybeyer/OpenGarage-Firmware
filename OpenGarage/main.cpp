@@ -307,12 +307,9 @@ String get_ip() {
 
 void sta_controller_fill_json(String& json, bool fullversion=true) {
   json = "";
-  if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-		json += F("\"sn2\":");
-		json += sn2_value;
-		json += F(",");
-  }
-  json += F("\"door\":");
+  json += F("{\"sn2\":");
+  json += sn2_value;
+  json += F(",\"door\":");
   json += door_status;
   json += F(",\"vehicle\":");
   json += vehicle_status;
@@ -379,8 +376,6 @@ void sta_logs_fill_json(String& json) {
   json += og.options[OPTION_NAME].sval;
   json += F("\",\"time\":");
   json += curr_utc_time;
-  json += F(",\"ncols\":");
-  json += og.options[OPTION_SN2].ival>OG_SN2_NONE ? 4 : 3;
   json += F(",\"logs\":[");
   if(!og.read_log_start()) {
     json += F("]}");
@@ -395,10 +390,8 @@ void sta_logs_fill_json(String& json) {
     json += l.tstamp;
     json += F(",");
     json += l.status;
-    if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-	    json += F(",");
-	    json += l.sn2;
-	  }
+    json += F(",");
+    json += l.sn2;
     json += F("],");
   }
   og.read_log_end();
@@ -1167,8 +1160,7 @@ void check_status() {
       LogStruct l;
       l.tstamp = curr_utc_time;
       l.status = door_status;
-      l.sn2 = 255;	// use 255 to indicate invalid value
-      if(og.options[OPTION_SN2].ival>OG_SN2_NONE) l.sn2 = sn2_value;
+l.sn2 = sn2_value;
       og.write_log(l);
 
 #if 0

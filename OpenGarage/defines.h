@@ -53,14 +53,8 @@
 #define OG_SN1_CEILING  0x00	// SN1 is built-in ultrasonic sensor
 #define OG_SN1_SIDE     0x01
 
-#define OG_SN2_NONE			0x00	// SN2 is optional switch sensor
 #define OG_SN2_NC				0x01	// NC: normally closed
 #define OG_SN2_NO				0x02	// NO: normally open
-
-#define OG_SNO_1ONLY		0x00	// use SN1 only
-#define OG_SNO_2ONLY		0x01	// use SN2 only
-#define OG_SNO_AND			0x02	// SN1 AND SN2
-#define OG_SNO_OR				0x03	// SN1 OR SN2
 
 #define OG_SFI_MEDIAN		 0x00	// sensor filter: median method
 #define OG_SFI_CONSENSUS 0x01	// concensus method
