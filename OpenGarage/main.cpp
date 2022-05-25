@@ -21,8 +21,8 @@
  */
 
 #if defined(SERIAL_DEBUG)
-  #define BLYNK_DEBUG
-  #define BLYNK_PRINT Serial
+#define BLYNK_DEBUG
+#define BLYNK_PRINT Serial
 #endif
 
 #include <BlynkSimpleEsp8266.h>
@@ -84,7 +84,7 @@ byte findKeyVal (const char *str, const char *key, char *strbuf=NULL, uint8_t ma
         str++;
         kp=key;
         if (*str == '='){
-            found=1;
+	  found=1;
         }
       }
     } else {
@@ -114,7 +114,7 @@ byte findKeyVal (const char *str, const char *key, char *strbuf=NULL, uint8_t ma
 
 // this is simplified version to check if MQTT / NTP server is valid domain name
 bool valid_url(String s) {
-	return (s.length()>0 && s[0]!='-' && s.indexOf('.')>0);
+  return (s.length()>0 && s[0]!='-' && s.indexOf('.')>0);
 }
 
 void server_send_html_P(PGM_P content) {
@@ -311,8 +311,8 @@ void sta_controller_fill_json(String& json, bool fullversion=true) {
   json += F("{\"dist\":");
   json += distance;
   if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-		json += F(",\"sn2\":");
-		json += sn2_value;
+    json += F(",\"sn2\":");
+    json += sn2_value;
   }
   json += F(",\"door\":");
   json += door_status;
@@ -321,22 +321,22 @@ void sta_controller_fill_json(String& json, bool fullversion=true) {
   json += F(",\"rcnt\":");
   json += read_cnt;
   if(fullversion) {
-		json += F(",\"fwv\":");
-		json += og.options[OPTION_FWV].ival;
-		json += F(",\"name\":\"");
-		json += og.options[OPTION_NAME].sval;
-		json += F("\",\"mac\":\"");
-		json += get_mac();
-		json += F("\",\"cid\":");
-		json += ESP.getChipId();
-		json += F(",\"rssi\":");
-		json += (int16_t)WiFi.RSSI();
-	}
+    json += F(",\"fwv\":");
+    json += og.options[OPTION_FWV].ival;
+    json += F(",\"name\":\"");
+    json += og.options[OPTION_NAME].sval;
+    json += F("\",\"mac\":\"");
+    json += get_mac();
+    json += F("\",\"cid\":");
+    json += ESP.getChipId();
+    json += F(",\"rssi\":");
+    json += (int16_t)WiFi.RSSI();
+  }
   if(og.options[OPTION_TSN].ival) {
-  	json += F(",\"temp\":");
-  	json += tempC;
-  	json += F(",\"humid\":");
-  	json += humid;
+    json += F(",\"temp\":");
+    json += tempC;
+    json += F(",\"humid\":");
+    json += humid;
   }
   json += F("}");
 }
@@ -400,9 +400,9 @@ void sta_logs_fill_json(String& json) {
     json += F(",");
     json += l.dist;
     if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-	    json += F(",");
-	    json += l.sn2;
-	  }
+      json += F(",");
+      json += l.sn2;
+    }
     json += F("],");
   }
   og.read_log_end();
@@ -513,7 +513,7 @@ void sta_change_options_main(const char *command) {
     const char *key = o->name.c_str();
     // these options cannot be modified here
     if(i==OPTION_FWV || i==OPTION_MOD  || i==OPTION_SSID ||
-      i==OPTION_PASS || i==OPTION_DKEY)
+       i==OPTION_PASS || i==OPTION_DKEY)
       continue;
     
     if(o->max) {  // integer options
@@ -524,8 +524,8 @@ void sta_change_options_main(const char *command) {
         }
         // check min limit
         if(i==OPTION_DRI && ival < 50) {
-        	server_send_result(command,HTML_DATA_OUTOFBOUND, key);
-        	return;
+	  server_send_result(command,HTML_DATA_OUTOFBOUND, key);
+	  return;
         }
         if(i==OPTION_LSZ && ival < 20) {
           // minimal log size is 20
@@ -565,10 +565,10 @@ void sta_change_options_main(const char *command) {
           }
         }
         if(get_value_by_key(command, _dns1, dns1)) {
-        	if(!ip.fromString(dns1)) {
+	  if(!ip.fromString(dns1)) {
             server_send_result(command, HTML_DATA_FORMATERROR, _dns1);
             return;
-        	}
+	  }
         }
       } else {
         server_send_result(command, HTML_DATA_MISSING, _gwip);
@@ -602,7 +602,7 @@ void sta_change_options_main(const char *command) {
     const char *key = o->name.c_str();
     // these options cannot be modified here
     if(i==OPTION_FWV || i==OPTION_MOD  || i==OPTION_SSID ||
-      i==OPTION_PASS || i==OPTION_DKEY)
+       i==OPTION_PASS || i==OPTION_DKEY)
       continue;
     
     if(o->max) {  // integer options
@@ -611,8 +611,8 @@ void sta_change_options_main(const char *command) {
       }
     } else {
       if(get_value_by_key(command, key, sval)) {
-	    	// check MQTT password, if it's empty, leave unchanged
-	    	if(i==OPTION_MQPW && sval.length()==0) continue;
+	// check MQTT password, if it's empty, leave unchanged
+	if(i==OPTION_MQPW && sval.length()==0) continue;
 	    	
         o->sval = sval;
       }
@@ -628,12 +628,12 @@ void sta_change_options_main(const char *command) {
       og.options[OPTION_SUBN].sval = subn;
     }
     if(get_value_by_key(command, _dns1, dns1)) {
-    	og.options[OPTION_DNS1].sval = dns1;
+      og.options[OPTION_DNS1].sval = dns1;
     }
   }
   
   if(get_value_by_key(command, _nkey, nkey)) {
-      og.options[OPTION_DKEY].sval = nkey;
+    og.options[OPTION_DKEY].sval = nkey;
   }
 
   og.options_save();
@@ -658,17 +658,17 @@ void sta_options_fill_json(String& json) {
         json += F("\"");
         // fill in default string values for certain options
         if(o->sval.length()==0) {
-        	switch(i) {
-        	case OPTION_MQTP:
-        		json += og.options[OPTION_NAME].sval;
-        		break;
-        	case OPTION_HOST:
-        		json += get_ap_ssid();
-        		break;
-        	case OPTION_NTP1:
-        		json += DEFAULT_NTP1;
-        		break;
-        	}
+	  switch(i) {
+	  case OPTION_MQTP:
+	    json += og.options[OPTION_NAME].sval;
+	    break;
+	  case OPTION_HOST:
+	    json += get_ap_ssid();
+	    break;
+	  case OPTION_NTP1:
+	    json += DEFAULT_NTP1;
+	    break;
+	  }
         } else {
 	        json += o->sval;
 	      }

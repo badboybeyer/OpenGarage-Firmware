@@ -52,6 +52,7 @@
 
 #define OG_SN1_CEILING  0x00	// SN1 is built-in ultrasonic sensor
 #define OG_SN1_SIDE     0x01
+#define OG_SN1_NONE     0x02
 
 #define OG_SN2_NONE			0x00	// SN2 is optional switch sensor
 #define OG_SN2_NC				0x01	// NC: normally closed
@@ -110,10 +111,10 @@
 #define BLYNK_PIN_TEMP	V6
 #define BLYNK_PIN_HUMID V7
 /*#define BLYNK_PIN_JC    V10
-#define BLYNK_PIN_CC    V11
-#define BLYNK_PIN_JO    V12
-#define BLYNK_PIN_CO    V13
-#define BLYNK_PIN_JL    V14*/
+  #define BLYNK_PIN_CC    V11
+  #define BLYNK_PIN_JO    V12
+  #define BLYNK_PIN_CO    V13
+  #define BLYNK_PIN_JL    V14*/
 
 enum {
   DIRTY_BIT_JC = 0,
@@ -200,13 +201,13 @@ typedef enum {
 
 #if defined(SERIAL_DEBUG)
 
-  #define DEBUG_PRINT(x)   Serial.print(x)
-  #define DEBUG_PRINTLN(x) Serial.println(x)
+#define DEBUG_PRINT(x)   Serial.print(x)
+#define DEBUG_PRINTLN(x) Serial.println(x)
 
 #else
 
-  #define DEBUG_PRINT(x)   {}
-  #define DEBUG_PRINTLN(x) {}
+#define DEBUG_PRINT(x)   {}
+#define DEBUG_PRINTLN(x) {}
 
 #endif
 
