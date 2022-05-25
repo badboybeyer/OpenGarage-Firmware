@@ -58,8 +58,7 @@
 #define OG_SN2_NC				0x01	// NC: normally closed
 #define OG_SN2_NO				0x02	// NO: normally open
 
-#define OG_SNO_1ONLY		0x00	// use SN1 only
-#define OG_SNO_2ONLY		0x01	// use SN2 only
+// SNO values 1 and 0 are deprecated - do not reuse
 #define OG_SNO_AND			0x02	// SN1 AND SN2
 #define OG_SNO_OR				0x03	// SN1 OR SN2
 

@@ -22,6 +22,7 @@
 
 #include "OpenGarage.h"
 
+const byte SNO_DEAFULT = OG_SNO_AND;
 byte  OpenGarage::state = OG_STATE_INITIAL;
 File  OpenGarage::log_file;
 byte  OpenGarage::alarm = 0;
@@ -44,9 +45,9 @@ extern OpenGarage og;
  */
 OptionStruct OpenGarage::options[] = {
   {"fwv", OG_FWV,      255, ""},
-  {"sn1", OG_SN1_NONE,1, ""},
+  {"sn1", OG_SN1_NONE,   2, ""},
   {"sn2", OG_SN2_NONE,   2, ""},
-  {"sno", OG_SNO_1ONLY,	 3, ""},
+  {"sno", SNO_DEFAULT,	 3, ""},
   {"dth", 50,        65535, ""},
   {"vth", 150,       65535, ""},
   {"riv", 5,           300, ""},
@@ -252,6 +253,9 @@ void OpenGarage::options_load() {
     } else {  // this is a string option
       options[idx].sval = sval;
     }
+    // sn2 only and sn1 only deprecated - revert to default
+    if (name == "sno" && options[idx].sval < OG_SNO_AND)
+      options[idx].sval = SNO_DEAFULT;
   }
   file.close();
 }
