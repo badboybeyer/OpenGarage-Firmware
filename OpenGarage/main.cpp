@@ -1179,28 +1179,28 @@ void check_status() {
           vehicle_status = ((distance>dth) && (distance <=vth)) ? OG_VEH_PRESENT:OG_VEH_ABSENT;
         } else { vehicle_status = OG_VEH_UNKNOWN; }	// door is open, blocking view of vehicle
       } else {vehicle_status = OG_VEH_NOTAVAIL;} // vth undefined
-		}
+    }
 		
-		// Read SN2 -- optional switch sensor
-		sn2_value = og.get_switch();
-		byte sn2_status = 0;
-		if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
-			sn2_status = sn2_value;
-		} else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
-			sn2_status = 1-sn2_value;
-		}
+    // Read SN2 -- optional switch sensor
+    sn2_value = og.get_switch();
+    byte sn2_status = 0;
+    if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
+      sn2_status = sn2_value;
+    } else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
+      sn2_status = 1-sn2_value;
+    }
 
-		// Process Sensor Logic
-		if(og.options[OPTION_SN2].ival==OG_SN2_NONE || og.options[OPTION_SNO].ival==OG_SNO_1ONLY) {
-			// if SN2 not installed or logic is SN1 only
-			door_status = sn1_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_2ONLY) {
-			door_status = sn2_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_AND) {
-			door_status = sn1_status && sn2_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_OR) {
-			door_status = sn1_status || sn2_status;
-		}
+    // Process Sensor Logic
+    if(og.options[OPTION_SN2].ival==OG_SN2_NONE || og.options[OPTION_SNO].ival==OG_SNO_1ONLY) {
+      // if SN2 not installed or logic is SN1 only
+      door_status = sn1_status;
+    } else if(og.options[OPTION_SNO].ival==OG_SNO_2ONLY) {
+      door_status = sn2_status;
+    } else if(og.options[OPTION_SNO].ival==OG_SNO_AND) {
+      door_status = sn1_status && sn2_status;
+    } else if(og.options[OPTION_SNO].ival==OG_SNO_OR) {
+      door_status = sn1_status || sn2_status;
+    }
     
     // get temperature readings
     og.read_TH_sensor(tempC, humid);
@@ -1226,9 +1226,9 @@ void check_status() {
       LogStruct l;
       l.tstamp = curr_utc_time;
       l.status = door_status;
-      if(og.options[OPTION_SN1].ival != OG_SN1_NONE) l.dist = distance;
+      if (og.options[OPTION_SN1].ival != OG_SN1_NONE) l.dist = distance;
       else l.dist = UINT_MAX;	// use UINT_MAX to indicate invalid value
-      if(og.options[OPTION_SN2].ival != OG_SN2_NONE) l.sn2 = sn2_value;
+      if (og.options[OPTION_SN2].ival != OG_SN2_NONE) l.sn2 = sn2_value;
       else l.sn2 = CHAR_MAX;	// use CHAR_MAX to indicate invalid value
       og.write_log(l);
 
