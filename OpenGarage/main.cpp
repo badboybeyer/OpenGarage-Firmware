@@ -1022,7 +1022,7 @@ void perform_notify(String s) {
   // IFTTT notification
   if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
     DEBUG_PRINTLN(" Sending IFTTT Notification");
-    http.begin("http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
+    http.begin(wificlient, "http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
     http.addHeader("Content-Type", "application/json");
     http.POST("{\"value1\":\""+s+"\"}");
     String payload = http.getString();
