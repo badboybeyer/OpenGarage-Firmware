@@ -312,6 +312,8 @@ void sta_controller_fill_json(String& json, bool fullversion=true) {
   if(og.options[OPTION_SN1].ival != OG_SN1_NONE) {
     json += F("\"dist\":");
     json += distance;
+    json += F(",\"vehicle\":");
+    json += vehicle_status;    
     json += F(",");
   }
   if(og.options[OPTION_SN2].ival != OG_SN2_NONE) {
@@ -321,8 +323,6 @@ void sta_controller_fill_json(String& json, bool fullversion=true) {
   }
   json += F("\"door\":");
   json += door_status;
-  json += F(",\"vehicle\":");
-  json += vehicle_status;
   json += F(",\"rcnt\":");
   json += read_cnt;
   if(fullversion) {
