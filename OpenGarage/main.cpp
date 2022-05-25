@@ -1129,7 +1129,6 @@ void check_status() {
     
     // Read garage door switch sensor (reed relay)
     sn2_value = og.get_switch();
-    byte door_status = 0;
     if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
       door_status = sn2_value;
     } else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
