@@ -69,6 +69,8 @@ static byte door_status_hist = 0;
 static ulong curr_utc_time = 0;
 static ulong curr_utc_hour= 0;
 static HTTPClient http;
+const uint MAX_DISTANCE = 500;
+const byte REPORT_STATUS_INTERVAL_SECONDS = 15;
 
 void do_setup();
 
@@ -883,22 +885,6 @@ void process_ui()
   }  
 }
 
-byte check_door_status_hist() {
-  // perform pattern matching of door status histogram
-  // and return the corresponding results
-  const byte allones = (1<<DOOR_STATUS_HIST_K)-1;       // 0b1111
-  const byte lowones = (1<<(DOOR_STATUS_HIST_K/2))-1; // 0b0011
-  const byte highones= lowones << (DOOR_STATUS_HIST_K/2); // 0b1100
-  
-  byte _hist = door_status_hist & allones;  // get the lowest K bits
-  if(_hist == 0) return DOOR_STATUS_REMAIN_CLOSED;
-  if(_hist == allones) return DOOR_STATUS_REMAIN_OPEN;
-  if(_hist == lowones) return DOOR_STATUS_JUST_OPENED;
-  if(_hist == highones) return DOOR_STATUS_JUST_CLOSED;
-
-  return DOOR_STATUS_MIXED;
-}
-
 void on_sta_update() {
   server_send_html_P(sta_update_html);
 }
@@ -1153,210 +1139,38 @@ void check_status() {
   if((curr_utc_time > checkstatus_timeout) || (checkstatus_timeout == 0))  { //also check on first boot
     og.set_led(HIGH);
     aux_ticker.once_ms(25, og.set_led, (byte)LOW);
-    
-    // Read SN1 -- ultrasonic sensor
-    uint dth = og.options[OPTION_DTH].ival;
-    uint vth = og.options[OPTION_VTH].ival;
-    bool sn1_status;
-    distance = og.read_distance();
-    if((distance==0 || distance>500 || !fullbuffer) && og.options[OPTION_SNO].ival!=OG_SNO_2ONLY) {
-      // invalid distance value or non full buffer, return immediately except if using SN2 only
-      DEBUG_PRINTLN(F("invalid distance or non-full buffer"));
-      checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
-      return; 
-    }
-		
-    sn1_status = (distance>dth)?0:1;
-    if(og.options[OPTION_SN1].ival == OG_SN1_SIDE) {
-      sn1_status = 1-sn1_status; // reverse logic for side mount
-      // for side-mount, we can't decide vehicle status
-      vehicle_status = OG_VEH_NOTAVAIL;
-    } else {
-      if (vth>0) {
-        if(!sn1_status) {
-        	// if vehicle distance threshold is defined and door is closed (i.e. not blocking view of vehicle)
-        	// vehicle status can be determined by checking if distance is within bracket [dth, vth]
-          vehicle_status = ((distance>dth) && (distance <=vth)) ? OG_VEH_PRESENT:OG_VEH_ABSENT;
-        } else { vehicle_status = OG_VEH_UNKNOWN; }	// door is open, blocking view of vehicle
-      } else {vehicle_status = OG_VEH_NOTAVAIL;} // vth undefined
-    }
-		
-    // Read SN2 -- optional switch sensor
-    sn2_value = og.get_switch();
-    byte sn2_status = 0;
-    if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
-      sn2_status = sn2_value;
-    } else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
-      sn2_status = 1-sn2_value;
-    }
 
-    // Process Sensor Logic
-    if(og.options[OPTION_SN2].ival==OG_SN2_NONE || og.options[OPTION_SNO].ival==OG_SNO_1ONLY) {
-      // if SN2 not installed or logic is SN1 only
-      door_status = sn1_status;
-    } else if(og.options[OPTION_SNO].ival==OG_SNO_2ONLY) {
-      door_status = sn2_status;
-    } else if(og.options[OPTION_SNO].ival==OG_SNO_AND) {
-      door_status = sn1_status && sn2_status;
-    } else if(og.options[OPTION_SNO].ival==OG_SNO_OR) {
-      door_status = sn1_status || sn2_status;
-    }
+    byte sn1_status = read_ultrasonic();
+    byte sn2_status = read_switch();
+    update_door_status(sn1_status, sn2_status, checkstatus_timeout);
     
     // get temperature readings
     og.read_TH_sensor(tempC, humid);
     read_cnt = (read_cnt+1)%100;    
     
-    if (checkstatus_timeout == 0){
-      DEBUG_PRINTLN(F("First time checking status don't trigger a status change, set full history to current value"));
-      if (door_status) { door_status_hist = B11111111; }
-      else { door_status_hist = B00000000; }
-    }else{
-       door_status_hist = (door_status_hist<<1) | door_status;
-    }
-    //DEBUG_PRINT(F("Histogram value:"));
-    //DEBUG_PRINTLN(door_status_hist);
-    //DEBUG_PRINT(F("Vehicle Status:"));
-    //DEBUG_PRINTLN(vehicle_status);
     byte event = check_door_status_hist();
 
     //Upon change
     if(event == DOOR_STATUS_JUST_OPENED || event == DOOR_STATUS_JUST_CLOSED) {
-      // write log record
-      DEBUG_PRINTLN(" Update Local Log"); 
-      LogStruct l;
-      l.tstamp = curr_utc_time;
-      l.status = door_status;
-      if (og.options[OPTION_SN1].ival != OG_SN1_NONE) l.dist = distance;
-      else l.dist = UINT_MAX;	// use UINT_MAX to indicate invalid value
-      if (og.options[OPTION_SN2].ival != OG_SN2_NONE) l.sn2 = sn2_value;
-      else l.sn2 = CHAR_MAX;	// use CHAR_MAX to indicate invalid value
-      og.write_log(l);
-
+      record_event_to_log();
 #if 0
-      //Debug Beep (only if sound is enabled)
-      if(og.options[OPTION_ALM].ival){
-        og.play_note(1000);
-        delay(500);
-        og.play_note(0);
-      }
-      DEBUG_PRINT(curr_utc_time);
-      if(event == DOOR_STATUS_JUST_OPENED)  {	
-        DEBUG_PRINTLN(F(" Sending State Change event to connected systems, value: DOOR_STATUS_JUST_OPENED")); }
-      else if(event == DOOR_STATUS_JUST_CLOSED) {	
-        DEBUG_PRINTLN(F(" Sending State Change event to connected systems, value: DOOR_STATUS_JUST_CLOSED")); }
-#endif
-      
-      // Blynk notification
-#if 0
-      byte ato = og.options[OPTION_ATO].ival;
-      if(curr_cloud_access_en && Blynk.connected() && ato) {
-        //The official firmware only sends these notifications on ato enabled (which seems a somewhat unrelated function)
-        //Maintain backwards compat and use same logic
-        DEBUG_PRINTLN(F(" Notify Blynk with text notification"));
-        if(event == DOOR_STATUS_JUST_OPENED)  {	
-          Blynk.notify(og.options[OPTION_NAME].sval + " just opened!");}
-        else if(event == DOOR_STATUS_JUST_CLOSED) {	
-          Blynk.notify(og.options[OPTION_NAME].sval + " just closed!");}
-      }
-
-      // IFTTT notification
-      if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
-        DEBUG_PRINTLN(F(" Notify IFTTT (State Change)")); 
-        http.begin("http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
-        http.addHeader("Content-Type", "application/json");
-        http.POST("{\"value1\":\""+String(event,DEC)+"\"}");
-        String payload = http.getString();
-        http.end();
-        if(payload.indexOf("Congratulations") >= 0) {
-          DEBUG_PRINTLN(F("  Successfully updated IFTTT"));
-        }else{
-          DEBUG_PRINT(F("  ERROR from IFTTT: "));
-          DEBUG_PRINTLN(payload);
-        }
-      }
-
-      //Mqtt notification
-      if(valid_url(og.options[OPTION_MQTT].sval)) {
-        if (mqttclient.connected()) {
-          DEBUG_PRINTLN(F(" Update MQTT (State Change)"));
-          mqttclient.publish((mqtt_topic + "/OUT/CHANGE").c_str(),String(event,DEC)); 
-        }
-      }
-#endif
+      report_event_to_debug(event);
+      report_event_to_blynk(event);
+      report_event_to_ifttt(event);
+      report_event_to_mqtt(event);
+#endif      
     } //End state change updates
 
     //Send current status only on change and longer interval
-    if ((curr_utc_time >checkstatus_report_timeout) || (event == DOOR_STATUS_JUST_OPENED || event == DOOR_STATUS_JUST_CLOSED) ){
+    if ((curr_utc_time > checkstatus_report_timeout) ||
+        (event == DOOR_STATUS_JUST_OPENED || event == DOOR_STATUS_JUST_CLOSED) ){
 #if 0
-      DEBUG_PRINT(curr_utc_time);
-      if(event == DOOR_STATUS_REMAIN_OPEN)  {	
-        DEBUG_PRINTLN(F(" Sending State Refresh to connected systems, value: OPEN")); }
-      else if(event == DOOR_STATUS_REMAIN_CLOSED) {	
-        DEBUG_PRINTLN(F(" Sending State Refresh to connected systems, value: CLOSED")); }
-#endif
-      
+      report_status_to_debug();
+#endif      
       //IFTTT only recieves state change events not ongoing status
-
-      //Mqtt update
-      if(valid_url(og.options[OPTION_MQTT].sval) && (mqttclient.connected())) {
-        DEBUG_PRINTLN(F(" Update MQTT (State Refresh)"));
-        if(door_status == DOOR_STATUS_REMAIN_OPEN)  {						// MQTT: If door open...
-          mqttclient.publish((mqtt_topic + "/OUT/STATE").c_str(),"OPEN");
-          mqttclient.publish(mqtt_topic.c_str(),"Open"); //Support existing mqtt code
-          //DEBUG_PRINTLN(curr_utc_time + " Sending MQTT State otification: OPEN");
-        } 
-        else if(door_status == DOOR_STATUS_REMAIN_CLOSED) {					// MQTT: If door closed...
-          mqttclient.publish((mqtt_topic + "/OUT/STATE").c_str(),"CLOSED");
-          mqttclient.publish(mqtt_topic.c_str(),"Closed"); //Support existing mqtt code
-          //DEBUG_PRINTLN(curr_utc_time + " Sending MQTT State Notification: CLOSED");
-        }
-        String msg;
-        sta_controller_fill_json(msg, false);
-        mqttclient.publish((mqtt_topic + "/OUT/JSON").c_str(),msg.c_str());
-      }
+      report_status_to_mqtt();
       // Send status report every 15 seconds: we don't need to send updates frequently if there is no status change.
-      checkstatus_report_timeout= curr_utc_time + 15; 
-    }
-    
-    // Process dynamics: automation and notifications
-    // report status to Blynk
-    if(curr_cloud_access_en && Blynk.connected()) {
-      DEBUG_PRINTLN(F(" Update Blynk (State Refresh)"));
-      
-      static uint old_distance = 0;
-      static byte old_door_status = 0xff, old_vehicle_status = 0xff;
-      static String old_ip = "";
-      static float old_tempC = -100;
-      static float old_humid = -100;
-      
-      // to reduce traffic, only send updated values
-      if(distance != old_distance) {  Blynk.virtualWrite(BLYNK_PIN_DIST, distance); old_distance = distance; }
-      if(door_status != old_door_status) { (door_status) ? blynk_door.on() : blynk_door.off(); old_door_status = door_status; }
-      if(vehicle_status != old_vehicle_status) { (vehicle_status==1) ? blynk_car.on() : blynk_car.off(); old_vehicle_status = vehicle_status; }
-      if(old_ip != get_ip()) { Blynk.virtualWrite(BLYNK_PIN_IP, get_ip()); old_ip = get_ip(); }
-      // hack to simulate temp humid changes
-      if(old_tempC != tempC) { Blynk.virtualWrite(BLYNK_PIN_TEMP, tempC); old_tempC = tempC; }
-      if(old_humid != humid) { Blynk.virtualWrite(BLYNK_PIN_HUMID,humid); old_humid = humid; }
-
-      // report json strings to Blynk
-      /* comment this section out as the features are not fully ready yet
-      String json;
-      static String old_json = "";
-      sta_controller_fill_json(json);
-      if(old_json != json) { Blynk.virtualWrite(BLYNK_PIN_JC, json); old_json = json; }
-      
-      if(og.get_dirty_bit(DIRTY_BIT_JO)) {
-        sta_options_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JO, json);
-        og.set_dirty_bit(DIRTY_BIT_JO, 0);
-      }
-      
-      if(og.get_dirty_bit(DIRTY_BIT_JL)) {
-        sta_logs_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JL, json);
-        og.set_dirty_bit(DIRTY_BIT_JL, 0);
-      }
-      */
+      checkstatus_report_timeout= curr_utc_time + REPORT_STATUS_INTERVAL_SECONDS; 
     }
     
     process_dynamics(event);
@@ -1364,6 +1178,239 @@ void check_status() {
     
   }
 }
+
+byte read_ultrasonic() {
+  if (og.options[OPTION_SN1].ival == OG_SN1_NONE)
+    return OG_DOOR_UNKNOWN;
+    
+  // Read SN1 -- ultrasonic sensor
+  uint dth = og.options[OPTION_DTH].ival;
+  uint vth = og.options[OPTION_VTH].ival;
+  byte sn1_status;
+  distance = og.read_distance();
+
+  if (!fullbuffer) {
+    // non full buffer, return immediately
+    DEBUG_PRINTLN(F("distance buffer not full"));
+    checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
+    return OG_DOOR_UNKNOWN; 
+  }  
+  if (distance == 0 || distance > MAX_DISTANCE) {
+    // invalid distance value, return immediately
+    DEBUG_PRINTLN(F("invalid distance"));
+    checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
+    return OG_DOOR_UNKNOWN; 
+  }
+		
+  if(og.options[OPTION_SN1].ival == OG_SN1_SIDE) {
+    sn1_status = (distance > dth) ? OG_DOOR_OPEN : OG_DOOR_CLOSED;
+    vehicle_status = OG_VEH_NOTAVAIL;
+  } else {
+    sn1_status = (distance > dth) ? OG_DOOR_CLOSED : OG_DOOR_OPEN;
+    if (vth>0) {
+      if(sn1_status == OG_DOOR_OPEN) {
+        // if vehicle distance threshold is defined and door is closed (i.e. not blocking view of vehicle)
+        // vehicle status can be determined by checking if distance is within bracket [dth, vth]
+        vehicle_status = ((distance > dth) && (distance <= vth)) ? OG_VEH_PRESENT : OG_VEH_ABSENT;
+      } else { vehicle_status = OG_VEH_UNKNOWN; }	// door is open, blocking view of vehicle
+    } else {vehicle_status = OG_VEH_NOTAVAIL;} // vth undefined
+  }
+  return sn1_status;
+}
+
+byte read_switch() {
+  if (og.options[OPTION_SN2].ival == OG_SN2_NONE)
+    return OG_DOOR_UNKNOWN;
+  
+  sn2_value = og.get_switch();
+  byte sn2_status = 0;
+  if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
+    sn2_status = (sn2_value) ? OG_DOOR_OPEN : OG_DOOR_CLOSED;
+  } else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
+    sn2_status = (sn2_value) ? OG_DOOR_CLOSED : OG_DOOR_OPEN;
+  }
+  return sn2_status;
+}
+
+
+void update_door_status(byte sn1_status, byte sn2_status, ulong checkstatus_timeout) {
+  if (og.options[OPTION_SN2].ival==OG_SN2_NONE) {
+    // if SN2 not installed
+    door_status = sn1_status;
+  } else if (og.options[OPTION_SN1].ival==OG_SN1_NONE) {
+    // if SN1 not installed
+    door_status = sn2_status;
+  } else if(og.options[OPTION_SNO].ival==OG_SNO_AND) {
+    door_status = sn1_status && sn2_status;
+  } else if(og.options[OPTION_SNO].ival==OG_SNO_OR) {
+    door_status = sn1_status || sn2_status;
+  }
+
+  if (checkstatus_timeout == 0){
+    DEBUG_PRINTLN(F("First time checking status don't trigger a status change, set full history to current value"));
+    door_status_hist = (door_status) ? B11111111 : B00000000;
+  } else {
+    door_status_hist = (door_status_hist << 1) | door_status;
+  }
+  //DEBUG_PRINT(F("Histogram value:"));
+  //DEBUG_PRINTLN(door_status_hist);
+  //DEBUG_PRINT(F("Vehicle Status:"));
+  //DEBUG_PRINTLN(vehicle_status);    
+}
+
+
+byte check_door_status_hist() {
+  // perform pattern matching of door status histogram
+  // and return the corresponding results
+  const byte allones = (1<<DOOR_STATUS_HIST_K)-1;       // 0b1111
+  const byte lowones = (1<<(DOOR_STATUS_HIST_K/2))-1; // 0b0011
+  const byte highones= lowones << (DOOR_STATUS_HIST_K/2); // 0b1100
+  
+  byte _hist = door_status_hist & allones;  // get the lowest K bits
+  if(_hist == 0) return DOOR_STATUS_REMAIN_CLOSED;
+  if(_hist == allones) return DOOR_STATUS_REMAIN_OPEN;
+  if(_hist == lowones) return DOOR_STATUS_JUST_OPENED;
+  if(_hist == highones) return DOOR_STATUS_JUST_CLOSED;
+
+  return DOOR_STATUS_MIXED;
+}
+
+void record_event_to_log() {
+  // write log record
+  DEBUG_PRINTLN(" Update Local Log"); 
+  LogStruct l;
+  l.tstamp = curr_utc_time;
+  l.status = door_status;
+  if (og.options[OPTION_SN1].ival != OG_SN1_NONE) l.dist = distance;
+  else l.dist = UINT_MAX;	// use UINT_MAX to indicate invalid value
+  if (og.options[OPTION_SN2].ival != OG_SN2_NONE) l.sn2 = sn2_value;
+  else l.sn2 = CHAR_MAX;	// use CHAR_MAX to indicate invalid value
+  og.write_log(l);
+}
+
+void report_event_to_debug(byte event) {
+  //Debug Beep (only if sound is enabled)
+  if(og.options[OPTION_ALM].ival){
+    og.play_note(1000);
+    delay(500);
+    og.play_note(0);
+  }
+  DEBUG_PRINT(curr_utc_time);
+  if(event == DOOR_STATUS_JUST_OPENED)  {	
+    DEBUG_PRINTLN(F(" Sending State Change event to connected systems, value: DOOR_STATUS_JUST_OPENED")); }
+  else if(event == DOOR_STATUS_JUST_CLOSED) {	
+    DEBUG_PRINTLN(F(" Sending State Change event to connected systems, value: DOOR_STATUS_JUST_CLOSED")); }
+}
+
+void report_event_to_blynk(byte event) {
+  byte ato = og.options[OPTION_ATO].ival;
+  if(curr_cloud_access_en && Blynk.connected() && ato) {
+    //The official firmware only sends these notifications on ato enabled (which seems a somewhat unrelated function)
+    //Maintain backwards compat and use same logic
+    DEBUG_PRINTLN(F(" Notify Blynk with text notification"));
+    if(event == DOOR_STATUS_JUST_OPENED)  {	
+      Blynk.notify(og.options[OPTION_NAME].sval + " just opened!");}
+    else if(event == DOOR_STATUS_JUST_CLOSED) {	
+      Blynk.notify(og.options[OPTION_NAME].sval + " just closed!");}
+  }
+}
+
+void report_event_to_ifttt(byte event) {
+  if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
+    DEBUG_PRINTLN(F(" Notify IFTTT (State Change)")); 
+    http.begin("http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
+    http.addHeader("Content-Type", "application/json");
+    http.POST("{\"value1\":\""+String(event,DEC)+"\"}");
+    String payload = http.getString();
+    http.end();
+    if(payload.indexOf("Congratulations") >= 0) {
+      DEBUG_PRINTLN(F("  Successfully updated IFTTT"));
+    }else{
+      DEBUG_PRINT(F("  ERROR from IFTTT: "));
+      DEBUG_PRINTLN(payload);
+    }
+  }
+}
+
+void report_event_to_mqtt(byte event) {
+  if(valid_url(og.options[OPTION_MQTT].sval)) {
+    if (mqttclient.connected()) {
+      DEBUG_PRINTLN(F(" Update MQTT (State Change)"));
+      mqttclient.publish((mqtt_topic + "/OUT/CHANGE").c_str(),String(event,DEC)); 
+    }
+  }
+}
+
+void report_status_to_debug() {
+  DEBUG_PRINT(curr_utc_time);
+  if(event == DOOR_STATUS_REMAIN_OPEN)  {	
+    DEBUG_PRINTLN(F(" Sending State Refresh to connected systems, value: OPEN")); }
+  else if(event == DOOR_STATUS_REMAIN_CLOSED) {	
+    DEBUG_PRINTLN(F(" Sending State Refresh to connected systems, value: CLOSED")); }
+}
+
+void report_status_to_mqtt() {
+  if(valid_url(og.options[OPTION_MQTT].sval) && (mqttclient.connected())) {
+    DEBUG_PRINTLN(F(" Update MQTT (State Refresh)"));
+    if(door_status == DOOR_STATUS_REMAIN_OPEN)  {
+      mqttclient.publish((mqtt_topic + "/OUT/STATE").c_str(),"OPEN");
+      mqttclient.publish(mqtt_topic.c_str(),"Open"); //Support existing mqtt code
+      //DEBUG_PRINTLN(curr_utc_time + " Sending MQTT State otification: OPEN");
+    } 
+    else if(door_status == DOOR_STATUS_REMAIN_CLOSED) {
+      mqttclient.publish((mqtt_topic + "/OUT/STATE").c_str(),"CLOSED");
+      mqttclient.publish(mqtt_topic.c_str(),"Closed"); //Support existing mqtt code
+      //DEBUG_PRINTLN(curr_utc_time + " Sending MQTT State Notification: CLOSED");
+    }
+    String msg;
+    sta_controller_fill_json(msg, false);
+    mqttclient.publish((mqtt_topic + "/OUT/JSON").c_str(),msg.c_str());
+  }
+}
+
+void report_status_to_blynk() {
+  // Process dynamics: automation and notifications
+  // report status to Blynk
+  if(curr_cloud_access_en && Blynk.connected()) {
+    DEBUG_PRINTLN(F(" Update Blynk (State Refresh)"));
+      
+    static uint old_distance = 0;
+    static byte old_door_status = 0xff, old_vehicle_status = 0xff;
+    static String old_ip = "";
+    static float old_tempC = -100;
+    static float old_humid = -100;
+      
+    // to reduce traffic, only send updated values
+    if(distance != old_distance) {  Blynk.virtualWrite(BLYNK_PIN_DIST, distance); old_distance = distance; }
+    if(door_status != old_door_status) { (door_status) ? blynk_door.on() : blynk_door.off(); old_door_status = door_status; }
+    if(vehicle_status != old_vehicle_status) { (vehicle_status==1) ? blynk_car.on() : blynk_car.off(); old_vehicle_status = vehicle_status; }
+    if(old_ip != get_ip()) { Blynk.virtualWrite(BLYNK_PIN_IP, get_ip()); old_ip = get_ip(); }
+    // hack to simulate temp humid changes
+    if(old_tempC != tempC) { Blynk.virtualWrite(BLYNK_PIN_TEMP, tempC); old_tempC = tempC; }
+    if(old_humid != humid) { Blynk.virtualWrite(BLYNK_PIN_HUMID,humid); old_humid = humid; }
+
+    // report json strings to Blynk
+    /* comment this section out as the features are not fully ready yet
+       String json;
+       static String old_json = "";
+       sta_controller_fill_json(json);
+       if(old_json != json) { Blynk.virtualWrite(BLYNK_PIN_JC, json); old_json = json; }
+      
+       if(og.get_dirty_bit(DIRTY_BIT_JO)) {
+       sta_options_fill_json(json);
+       Blynk.virtualWrite(BLYNK_PIN_JO, json);
+       og.set_dirty_bit(DIRTY_BIT_JO, 0);
+       }
+      
+       if(og.get_dirty_bit(DIRTY_BIT_JL)) {
+       sta_logs_fill_json(json);
+       Blynk.virtualWrite(BLYNK_PIN_JL, json);
+       og.set_dirty_bit(DIRTY_BIT_JL, 0);
+       }
+    */
+  }  
+}
+  
 
 void time_keeping() {
   static bool configured = false;
