@@ -1157,21 +1157,21 @@ void check_status() {
     // Read SN1 -- ultrasonic sensor
     uint dth = og.options[OPTION_DTH].ival;
     uint vth = og.options[OPTION_VTH].ival;
-		bool sn1_status;
-		distance = og.read_distance();
-		if((distance==0 || distance>500 || !fullbuffer) && og.options[OPTION_SNO].ival!=OG_SNO_2ONLY) {
-			// invalid distance value or non full buffer, return immediately except if using SN2 only
-			DEBUG_PRINTLN(F("invalid distance or non-full buffer"));
-			checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
-			return; 
-		}
+    bool sn1_status;
+    distance = og.read_distance();
+    if((distance==0 || distance>500 || !fullbuffer) && og.options[OPTION_SNO].ival!=OG_SNO_2ONLY) {
+      // invalid distance value or non full buffer, return immediately except if using SN2 only
+      DEBUG_PRINTLN(F("invalid distance or non-full buffer"));
+      checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
+      return; 
+    }
 		
-		sn1_status = (distance>dth)?0:1;
-		if(og.options[OPTION_SN1].ival == OG_SN1_SIDE) {
-			sn1_status = 1-sn1_status; // reverse logic for side mount
-			// for side-mount, we can't decide vehicle status
-			vehicle_status = OG_VEH_NOTAVAIL;
-		} else {
+    sn1_status = (distance>dth)?0:1;
+    if(og.options[OPTION_SN1].ival == OG_SN1_SIDE) {
+      sn1_status = 1-sn1_status; // reverse logic for side mount
+      // for side-mount, we can't decide vehicle status
+      vehicle_status = OG_VEH_NOTAVAIL;
+    } else {
       if (vth>0) {
         if(!sn1_status) {
         	// if vehicle distance threshold is defined and door is closed (i.e. not blocking view of vehicle)
