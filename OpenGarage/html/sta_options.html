@@ -11,29 +11,14 @@
 </fieldset>
 <div id='div_basic'>
 <table cellpadding=2>
-<tr><td><b>Device Name:</b></td><td><input type='text' size=10 maxlength=32 id='name' data-mini='true' value='-'></td></tr>
-<tr><td><b>Distance Sensor:</b><br><small>mounting method</small></td><td>
-<select name='sn1' id='sn1' data-mini='true'>
-<option value=0>Ceiling Mount</option>
-<option value=1>Side Mount</option>
-</select></td></tr>
-
-<tr><td><b>Door Thres. (cm): </b></td><td><input type='text' size=3 maxlength=4 id='dth' data-mini='true' value=0></td></tr>
-<tr><td><b>Car Thres. (cm):</b><br><small>set to 0 to disable</small></td><td><input type='text' size=3 maxlength=4 id='vth' data-mini='true' value=0 ></td></tr>
+  <tr><td><b>Device Name:</b></td><td><input type='text' size=10 maxlength=32 id='name' data-mini='true' value='-'></td></tr>
 <tr><td><b>Status Check (s):</b><br><small>check status every</small></td><td><input type='text' size=3 maxlength=3 id='riv' data-mini='true' value=0></td></tr>
 <tr><td><b>Click Time (ms):</b></td><td><input type='text' size=3 maxlength=5 id='cdt' value=0 data-mini='true'></td></tr>
 <tr><td><b>Switch Sensor:</b><br><small>on G04 and GND</small></td><td>
-<select name='sn2' id='sn2' data-mini='true' onChange='update_sno()'>
+<select name='sn2' id='sn2' data-mini='true'>
 <option value=0>(none)</option>
 <option value=1>Normally Closed</option>
 <option value=2>Normally Open</option>
-</select></td></tr>
-<tr><td><b>Sensor Logic:</b><a href='#snoInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Explanation</a><div data-role='popup' id='snoInfo' class='ui-content' data-theme='b' style='max-width:250px;'><p>Choose which sensor(s) determine door 'open' status.</p></div></td><td>
-<select name='sno' id='sno' data-mini='true' disabled='true'>
-<option value=0>Dist. sensor only</option>
-<option value=1>Switch sensor only</option>
-<option value=2>Dist. AND Switch</option>
-<option value=3>Dist. OR Switch</option>
 </select></td></tr>
 <tr><td><b>T/H Sensor:</b></td><td>
 <select name='tsn' id='tsn' data-mini='true'>
@@ -131,11 +116,6 @@
 </div>
 <script>
 function clear_msg() {$('#msg').text('');}
-function update_sno(){
-if(parseInt($('#sn2 option:selected').val())>0){
-$('#sno').selectmenu('enable'); 
-}else{$('#sno').selectmenu('disable');}
-}
 function update_mqtt(){
 if($('#mqtt').val().length>0){
 $('#mqpt').textinput('enable');$('#mqur').textinput('enable');$('#mqpw').textinput('enable');$('#mqtp').textinput('enable');
@@ -180,7 +160,7 @@ $('#btn_submit').click(function(e){
 e.preventDefault();
 if(confirm('Submit changes?')) {
 comm='co?dkey='+encodeURIComponent($('#dkey').val());
-bc('sn1');bc('sn2');bc('sno');bc('dth');bc('vth');bc('riv');bc('alm');
+bc('sn2');bc('riv');bc('alm');
 bc('lsz');bc('tsn');bc('htp');bc('cdt');bc('dri');bc('ati');bc('atib');
 comm+='&aoo='+($('#aoo').is(':checked')?1:0);
 comm+='&sto='+eval_cb('#to_cap');
@@ -229,12 +209,7 @@ $('#alm').val(jd.alm).selectmenu('refresh');
 if(jd.aoo>0) $('#aoo').attr('checked',true).checkboxradio('refresh');
 $('#lsz').val(jd.lsz).selectmenu('refresh');
 $('#tsn').val(jd.tsn).selectmenu('refresh');
-$('#sn1').val(jd.sn1).selectmenu('refresh');
 $('#sn2').val(jd.sn2).selectmenu('refresh');
-$('#sno').val(jd.sno).selectmenu('refresh');
-update_sno();
-$('#dth').val(jd.dth);
-$('#vth').val(jd.vth);
 $('#riv').val(jd.riv);
 $('#htp').val(jd.htp);
 $('#cdt').val(jd.cdt);

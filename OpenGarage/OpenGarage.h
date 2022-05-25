@@ -43,7 +43,6 @@ struct OptionStruct {
 struct LogStruct {
   ulong tstamp; // time stamp
   uint status;  // door status
-  uint dist;    // distance
   byte sn2;			// switch sensor value
 };
 
@@ -60,7 +59,6 @@ public:
   static void options_save();
   static void options_reset();
   static void restart() { ESP.restart();} //digitalWrite(PIN_RESET, LOW); }
-  static uint read_distance(); // centimeter
   static void init_sensors(); // initialize all sensor
   static void read_TH_sensor(float& C, float &H);
   static byte get_mode()   { return options[OPTION_MOD].ival; }

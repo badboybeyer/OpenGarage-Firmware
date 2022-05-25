@@ -44,11 +44,7 @@ extern OpenGarage og;
  */
 OptionStruct OpenGarage::options[] = {
   {"fwv", OG_FWV,      255, ""},
-  {"sn1", OG_SN1_CEILING,1, ""},
   {"sn2", OG_SN2_NONE,   2, ""},
-  {"sno", OG_SNO_1ONLY,	 3, ""},
-  {"dth", 50,        65535, ""},
-  {"vth", 150,       65535, ""},
   {"riv", 5,           300, ""},
   {"alm", OG_ALM_5,      2, ""},
   {"aoo", 0,             1, ""},
@@ -88,53 +84,6 @@ OptionStruct OpenGarage::options[] = {
   {"host", 0, 0, ""},
 };
 
-/* Variables and functions for handling Ultrasonic Distance sensor */
-#define KAVG 7  // k average
-volatile uint32_t ud_start = 0;
-volatile byte ud_i = 0;
-volatile boolean fullbuffer = false;
-volatile uint32_t ud_buffer[KAVG];
-volatile boolean triggered = false;
-
-// start trigger signal
-void ud_start_trigger() {
-  digitalWrite(PIN_TRIG, LOW);
-  delayMicroseconds(2);
-  digitalWrite(PIN_TRIG, HIGH);
-  delayMicroseconds(20);
-  triggered = true;
-  digitalWrite(PIN_TRIG, LOW);
-}
-
-ICACHE_RAM_ATTR void ud_isr() {
-  if(!triggered) return;
-
-  // ECHO pin went from low to high
-  if(digitalRead(PIN_ECHO)==HIGH) {
-    ud_start = micros();  // record start time
-  } else {
-    // ECHO pin went from high to low
-    triggered = false;
-    ud_buffer[ud_i] = micros() - ud_start; // calculate elapsed time
-    if(ud_buffer[ud_i]>26000L) {
-    	// timedout
-    	if(og.options[OPTION_STO].ival==0) {
-    		// ignore
-    		return;
-    	} else {
-    		// cap to max
-	    	ud_buffer[ud_i]=26000L;
-    	}
-    } else {
-		  ud_i = (ud_i+1)%KAVG; // circular buffer
-	    if(ud_i==0) fullbuffer=true;
-		}
-  }
-}
-
-void ud_ticker_cb() {
-	ud_start_trigger();
-}
     
 void OpenGarage::begin() {
   digitalWrite(PIN_RESET, HIGH);
@@ -276,58 +225,8 @@ void OpenGarage::options_save() {
   set_dirty_bit(DIRTY_BIT_JO, 1);
 }
 
-uint OpenGarage::read_distance() {
-  byte i;
-  static uint last_returned;
-  uint32_t buf[KAVG];
-  if(!fullbuffer) {
-  	last_returned = (ud_i>0)? (uint)(ud_buffer[ud_i-1]*0.01716f) : 0;
-  	return last_returned;
-  }
-  for(byte i=0;i<KAVG;i++) {
-  	buf[i] = ud_buffer[i];
-  }
-	
-	// noise filtering methods
-	if(options[OPTION_SFI].ival == OG_SFI_MEDIAN) {
-		// partial sorting of buf to perform median filtering
-		byte out, in;
-		for(out=1; out<=KAVG/2; out++){ 
-		  uint32_t temp = buf[out];
-		  in = out;
-		  while(in>0 && buf[in-1]>temp) {
-		    buf[in] = buf[in-1]; 
-		    in--;
-		  }
-		  buf[in] = temp;   
-		}
-		last_returned = (uint)(buf[KAVG/2]*0.01716f);  // 34320 cm / 2 / 10^6 s
-		return last_returned;
-	} else {
-		// use consensus algorithm
-		uint32_t vmin, vmax, sum;
-		vmin = vmax = sum = buf[0];
-		for(byte i=1;i<KAVG;i++) {
-			uint32_t v = buf[i];
-			vmin = (v<vmin)?v:vmin;
-			vmax = (v>vmax)?v:vmax;
-			sum += v;
-		}
-		// calculate margin
-		uint32_t margin = (float)options[OPTION_CMR].ival/0.01716f;
-		margin = (margin<60)?60:margin;
-		if(vmax-vmin<=margin) {
-			last_returned = (sum/KAVG)*0.01716f;
-		}
-		return last_returned;
-	}
-}
 
 void OpenGarage::init_sensors() {
-  // set up distance sensors
-  ud_ticker.attach_ms(options[OPTION_DRI].ival, ud_ticker_cb);
-  attachInterrupt(PIN_ECHO, ud_isr, CHANGE);
-
   switch(options[OPTION_TSN].ival) {
   case OG_TSN_AM2320:
     am2320 = new AM2320();

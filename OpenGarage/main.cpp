@@ -52,7 +52,6 @@ String mqtt_id;
 
 static String scanned_ssids;
 static byte read_cnt = 0;
-static uint distance = 0;
 static byte sn2_value = 0;
 static float tempC = 0;
 static float humid = 0;
@@ -308,13 +307,12 @@ String get_ip() {
 
 void sta_controller_fill_json(String& json, bool fullversion=true) {
   json = "";
-  json += F("{\"dist\":");
-  json += distance;
   if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
-		json += F(",\"sn2\":");
+		json += F("\"sn2\":");
 		json += sn2_value;
+		json += F(",");
   }
-  json += F(",\"door\":");
+  json += F("\"door\":");
   json += door_status;
   json += F(",\"vehicle\":");
   json += vehicle_status;
@@ -397,8 +395,6 @@ void sta_logs_fill_json(String& json) {
     json += l.tstamp;
     json += F(",");
     json += l.status;
-    json += F(",");
-    json += l.dist;
     if(og.options[OPTION_SN2].ival>OG_SN2_NONE) {
 	    json += F(",");
 	    json += l.sn2;
@@ -739,9 +735,7 @@ void on_ap_try_connect() {
 void on_ap_debug() {
   String json = "";
   json += F("{");
-  json += F("\"dist\":");
-  json += og.read_distance();
-  json += F(",\"fwv\":");
+  json += F("\"fwv\":");
   json += og.options[OPTION_FWV].ival;
   json += F("}");
   server_send_json(json);
@@ -974,7 +968,6 @@ void on_ap_upload() {
 void check_status_ap() {
   static ulong cs_timeout = 0;
   if(millis() > cs_timeout) {
-    Serial.println(og.read_distance());
     Serial.println(OG_FWV);
     cs_timeout = millis() + 2000;
   }
@@ -1141,54 +1134,15 @@ void check_status() {
     og.set_led(HIGH);
     aux_ticker.once_ms(25, og.set_led, (byte)LOW);
     
-    // Read SN1 -- ultrasonic sensor
-    uint dth = og.options[OPTION_DTH].ival;
-    uint vth = og.options[OPTION_VTH].ival;
-		bool sn1_status;
-		distance = og.read_distance();
-		if((distance==0 || distance>500 || !fullbuffer) && og.options[OPTION_SNO].ival!=OG_SNO_2ONLY) {
-			// invalid distance value or non full buffer, return immediately except if using SN2 only
-			DEBUG_PRINTLN(F("invalid distance or non-full buffer"));
-			checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
-			return; 
-		}
-		
-		sn1_status = (distance>dth)?0:1;
-		if(og.options[OPTION_SN1].ival == OG_SN1_SIDE) {
-			sn1_status = 1-sn1_status; // reverse logic for side mount
-			// for side-mount, we can't decide vehicle status
-			vehicle_status = OG_VEH_NOTAVAIL;
-		} else {
-      if (vth>0) {
-        if(!sn1_status) {
-        	// if vehicle distance threshold is defined and door is closed (i.e. not blocking view of vehicle)
-        	// vehicle status can be determined by checking if distance is within bracket [dth, vth]
-          vehicle_status = ((distance>dth) && (distance <=vth)) ? OG_VEH_PRESENT:OG_VEH_ABSENT;
-        } else { vehicle_status = OG_VEH_UNKNOWN; }	// door is open, blocking view of vehicle
-      } else {vehicle_status = OG_VEH_NOTAVAIL;} // vth undefined
-		}
-		
-		// Read SN2 -- optional switch sensor
-		sn2_value = og.get_switch();
-		byte sn2_status = 0;
-		if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
-			sn2_status = sn2_value;
-		} else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
-			sn2_status = 1-sn2_value;
-		}
+    // Read garage door switch sensor (reed relay)
+    sn2_value = og.get_switch();
+    byte door_status = 0;
+    if(og.options[OPTION_SN2].ival == OG_SN2_NC) {	// if SN2 is normally closed type
+      door_status = sn2_value;
+    } else if(og.options[OPTION_SN2].ival == OG_SN2_NO) {	// if SN2 is normally open type
+      door_status = 1-sn2_value;
+    }
 
-		// Process Sensor Logic
-		if(og.options[OPTION_SN2].ival==OG_SN2_NONE || og.options[OPTION_SNO].ival==OG_SNO_1ONLY) {
-			// if SN2 not installed or logic is SN1 only
-			door_status = sn1_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_2ONLY) {
-			door_status = sn2_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_AND) {
-			door_status = sn1_status && sn2_status;
-		} else if(og.options[OPTION_SNO].ival==OG_SNO_OR) {
-			door_status = sn1_status || sn2_status;
-		}
-    
     // get temperature readings
     og.read_TH_sensor(tempC, humid);
     read_cnt = (read_cnt+1)%100;    
@@ -1198,7 +1152,7 @@ void check_status() {
       if (door_status) { door_status_hist = B11111111; }
       else { door_status_hist = B00000000; }
     }else{
-       door_status_hist = (door_status_hist<<1) | door_status;
+      door_status_hist = (door_status_hist<<1) | door_status;
     }
     //DEBUG_PRINT(F("Histogram value:"));
     //DEBUG_PRINTLN(door_status_hist);
@@ -1213,7 +1167,6 @@ void check_status() {
       LogStruct l;
       l.tstamp = curr_utc_time;
       l.status = door_status;
-      l.dist = distance;
       l.sn2 = 255;	// use 255 to indicate invalid value
       if(og.options[OPTION_SN2].ival>OG_SN2_NONE) l.sn2 = sn2_value;
       og.write_log(l);
@@ -1309,16 +1262,13 @@ void check_status() {
     if(curr_cloud_access_en && Blynk.connected()) {
       DEBUG_PRINTLN(F(" Update Blynk (State Refresh)"));
       
-      static uint old_distance = 0;
-      static byte old_door_status = 0xff, old_vehicle_status = 0xff;
+      static byte old_door_status = 0xff;
       static String old_ip = "";
       static float old_tempC = -100;
       static float old_humid = -100;
       
       // to reduce traffic, only send updated values
-      if(distance != old_distance) {  Blynk.virtualWrite(BLYNK_PIN_DIST, distance); old_distance = distance; }
       if(door_status != old_door_status) { (door_status) ? blynk_door.on() : blynk_door.off(); old_door_status = door_status; }
-      if(vehicle_status != old_vehicle_status) { (vehicle_status==1) ? blynk_car.on() : blynk_car.off(); old_vehicle_status = vehicle_status; }
       if(old_ip != get_ip()) { Blynk.virtualWrite(BLYNK_PIN_IP, get_ip()); old_ip = get_ip(); }
       // hack to simulate temp humid changes
       if(old_tempC != tempC) { Blynk.virtualWrite(BLYNK_PIN_TEMP, tempC); old_tempC = tempC; }
@@ -1326,22 +1276,22 @@ void check_status() {
 
       // report json strings to Blynk
       /* comment this section out as the features are not fully ready yet
-      String json;
-      static String old_json = "";
-      sta_controller_fill_json(json);
-      if(old_json != json) { Blynk.virtualWrite(BLYNK_PIN_JC, json); old_json = json; }
+	 String json;
+	 static String old_json = "";
+	 sta_controller_fill_json(json);
+	 if(old_json != json) { Blynk.virtualWrite(BLYNK_PIN_JC, json); old_json = json; }
       
-      if(og.get_dirty_bit(DIRTY_BIT_JO)) {
-        sta_options_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JO, json);
-        og.set_dirty_bit(DIRTY_BIT_JO, 0);
-      }
+	 if(og.get_dirty_bit(DIRTY_BIT_JO)) {
+	 sta_options_fill_json(json);
+	 Blynk.virtualWrite(BLYNK_PIN_JO, json);
+	 og.set_dirty_bit(DIRTY_BIT_JO, 0);
+	 }
       
-      if(og.get_dirty_bit(DIRTY_BIT_JL)) {
-        sta_logs_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JL, json);
-        og.set_dirty_bit(DIRTY_BIT_JL, 0);
-      }
+	 if(og.get_dirty_bit(DIRTY_BIT_JL)) {
+	 sta_logs_fill_json(json);
+	 Blynk.virtualWrite(BLYNK_PIN_JL, json);
+	 og.set_dirty_bit(DIRTY_BIT_JL, 0);
+	 }
       */
     }
     
