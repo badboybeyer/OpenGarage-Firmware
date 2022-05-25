@@ -280,6 +280,9 @@ uint OpenGarage::read_distance() {
   byte i;
   static uint last_returned;
   uint32_t buf[KAVG];
+  if (options[OPTION_SN1].ival == OG_SN1_NONE)
+    return UINT_MAX;	// use UINT_MAX to indicate invalid value
+    
   if(!fullbuffer) {
     last_returned = (ud_i>0)? (uint)(ud_buffer[ud_i-1]*0.01716f) : 0;
     return last_returned;
@@ -324,9 +327,11 @@ uint OpenGarage::read_distance() {
 }
 
 void OpenGarage::init_sensors() {
-  // set up distance sensors
-  ud_ticker.attach_ms(options[OPTION_DRI].ival, ud_ticker_cb);
-  attachInterrupt(PIN_ECHO, ud_isr, CHANGE);
+  if (options[OPTION_SN1].ival != OG_SN1_NONE) {
+    // set up distance sensors
+    ud_ticker.attach_ms(options[OPTION_DRI].ival, ud_ticker_cb);
+    attachInterrupt(PIN_ECHO, ud_isr, CHANGE);
+  }
 
   switch(options[OPTION_TSN].ival) {
   case OG_TSN_AM2320:
