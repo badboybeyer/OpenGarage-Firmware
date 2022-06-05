@@ -28,6 +28,7 @@
 #include <BlynkSimpleEsp8266.h>
 #include <DNSServer.h>
 #include <PubSubClient.h>
+#include <string>
 
 #include "pitches.h"
 #include "OpenGarage.h"
@@ -49,6 +50,15 @@ static WiFiClient wificlient;
 PubSubClient mqttclient(wificlient);
 String mqtt_topic;
 String mqtt_id;
+
+byte read_ultrasonic(ulong &checkstatus_timeout);
+byte read_switch();
+void update_door_status(byte sn1_status, byte sn2_status, ulong checkstatus_timeout);
+void record_event_to_log();
+void report_event_to_mqtt(byte event);
+byte check_door_status_hist();
+void report_status_to_mqtt();
+void report_status_to_debug(byte event);
 
 static String scanned_ssids;
 static byte read_cnt = 0;
@@ -1021,7 +1031,7 @@ void perform_notify(String s) {
   // IFTTT notification
   if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
     DEBUG_PRINTLN(" Sending IFTTT Notification");
-    http.begin("http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
+    http.begin(wificlient, "http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
     http.addHeader("Content-Type", "application/json");
     http.POST("{\"value1\":\""+s+"\"}");
     String payload = http.getString();
@@ -1140,7 +1150,7 @@ void check_status() {
     og.set_led(HIGH);
     aux_ticker.once_ms(25, og.set_led, (byte)LOW);
 
-    byte sn1_status = read_ultrasonic();
+    byte sn1_status = read_ultrasonic(checkstatus_timeout);
     byte sn2_status = read_switch();
     update_door_status(sn1_status, sn2_status, checkstatus_timeout);
     
@@ -1165,7 +1175,7 @@ void check_status() {
     if ((curr_utc_time > checkstatus_report_timeout) ||
         (event == DOOR_STATUS_JUST_OPENED || event == DOOR_STATUS_JUST_CLOSED) ){
 #if 0
-      report_status_to_debug();
+      report_status_to_debug(event);
 #endif      
       //IFTTT only recieves state change events not ongoing status
       report_status_to_mqtt();
@@ -1179,7 +1189,7 @@ void check_status() {
   }
 }
 
-byte read_ultrasonic() {
+byte read_ultrasonic(ulong &checkstatus_timeout) {
   if (og.options[OPTION_SN1].ival == OG_SN1_NONE)
     return OG_DOOR_UNKNOWN;
     
@@ -1318,7 +1328,7 @@ void report_event_to_blynk(byte event) {
 void report_event_to_ifttt(byte event) {
   if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
     DEBUG_PRINTLN(F(" Notify IFTTT (State Change)")); 
-    http.begin("http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
+    http.begin(wificlient, "http://maker.ifttt.com/trigger/opengarage/with/key/"+og.options[OPTION_IFTT].sval);
     http.addHeader("Content-Type", "application/json");
     http.POST("{\"value1\":\""+String(event,DEC)+"\"}");
     String payload = http.getString();
@@ -1336,12 +1346,13 @@ void report_event_to_mqtt(byte event) {
   if(valid_url(og.options[OPTION_MQTT].sval)) {
     if (mqttclient.connected()) {
       DEBUG_PRINTLN(F(" Update MQTT (State Change)"));
-      mqttclient.publish((mqtt_topic + "/OUT/CHANGE").c_str(),String(event,DEC)); 
+      mqttclient.publish((mqtt_topic + "/OUT/CHANGE").c_str(),
+                         std::to_string(event).c_str()); 
     }
   }
 }
 
-void report_status_to_debug() {
+void report_status_to_debug(byte event) {
   DEBUG_PRINT(curr_utc_time);
   if(event == DOOR_STATUS_REMAIN_OPEN)  {	
     DEBUG_PRINTLN(F(" Sending State Refresh to connected systems, value: OPEN")); }

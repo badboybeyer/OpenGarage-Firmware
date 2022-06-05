@@ -22,7 +22,7 @@
 
 #include "OpenGarage.h"
 
-const byte SNO_DEAFULT = OG_SNO_AND;
+const byte SNO_DEFAULT = OG_SNO_AND;
 byte  OpenGarage::state = OG_STATE_INITIAL;
 File  OpenGarage::log_file;
 byte  OpenGarage::alarm = 0;
@@ -254,8 +254,8 @@ void OpenGarage::options_load() {
       options[idx].sval = sval;
     }
     // sn2 only and sn1 only deprecated - revert to default
-    if (name == "sno" && options[idx].sval < OG_SNO_AND)
-      options[idx].sval = SNO_DEAFULT;
+    if (name == "sno" && options[idx].ival < OG_SNO_AND)
+      options[idx].sval = SNO_DEFAULT;
   }
   file.close();
 }
