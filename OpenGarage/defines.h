@@ -24,7 +24,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    112   // Firmware version: 111 means 1.1.1
+#define OG_FWV    120   // Firmware version: 111 means 1.1.1
 
 /** GPIO pins */
 #define PIN_RELAY  15 //D8 on nodemcu

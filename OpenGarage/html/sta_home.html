@@ -128,7 +128,7 @@
     $.getJSON('jc', function(jd) {
       $('#fwv').text((jd.fwv/100>>0)+'.'+(jd.fwv/10%10>>0)+'.'+(jd.fwv%10>>0));
       $('#lbl_dist').text(jd.dist +' (cm)').css('color', jd.dist==450?'red':'black');
-      $('#lbl_status').text(jd.door?'OPEN':'CLOSED').css('color',jd.door?'red':'green'); 
+      $('#lbl_status').text(jd.door?'OPEN':'CLOSED').css('color',jd.door?'red':'green');
       //Hide or Show vehicle info
       if (jd.vehicle >=2){
         $('#lbl_vstatus1').hide();
@@ -143,8 +143,14 @@
       }else{
         $('#pic').attr('src', jd.door?'https://github.com/OpenGarage/OpenGarage-Firmware/raw/master/icons/Open.png':(jd.vehicle?'https://github.com/OpenGarage/OpenGarage-Firmware/raw/master/icons/ClosedPresent.png':'https://github.com/OpenGarage/OpenGarage-Firmware/raw/master/icons/ClosedAbsent.png'));
       }
-      if(typeof(jd.sn2)!='undefined') {$('#tbl_sn2').show(); $('#lbl_sn2').text(jd.sn2?'High':'Low');}
+      if (typeof(jd.sn2) != 'undefined') {$('#tbl_sn2').show(); $('#lbl_sn2').text(jd.sn2?'High':'Low');}
       else {$('#tbl_sn2').hide();}
+      if (typeof(jd.dist) != 'undefined') {$('#tbl_dist').show()}
+      else {$('#tbl_dist').hide();}
+      if (typeof(jd.vehicle) != 'undefined') {$('#tbl_vehicle').show()}
+      else {$('#tbl_vehicle').hide();}
+      if (jd.door != 3 ) {$('#tbl_door').show()}
+      else {$('#tbl_door').hide();}
       $('#lbl_beat').text(jd.rcnt);
       $('#lbl_rssi').text((jd.rssi>-71?'Good':(jd.rssi>-81?'Weak':'Poor')) +' ('+ jd.rssi +' dBm)');
       $('#head_name').text(jd.name);
