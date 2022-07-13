@@ -808,6 +808,7 @@ void do_setup()
     DEBUG_PRINTLN(og.options[OPTION_HTP].ival);
   }
   led_blink_ms = LED_FAST_BLINK;
+  ESP.wdtEnable(0);
 }
 
 void process_ui()
@@ -1122,7 +1123,8 @@ void process_dynamics(byte event) {
 
 void check_status() {
   static ulong checkstatus_timeout = 0;
-  static ulong checkstatus_report_timeout = 0; 
+  static ulong checkstatus_report_timeout = 0;
+  ESP.wdtFeed();
   if((curr_utc_time > checkstatus_timeout) || (checkstatus_timeout == 0))  { //also check on first boot
     og.set_led(HIGH);
     aux_ticker.once_ms(25, og.set_led, (byte)LOW);
